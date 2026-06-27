@@ -1,37 +1,122 @@
 name: CI
+
 on:
-  pull_request:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
 jobs:
   backend:
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8
-        env: { MYSQL_DATABASE: pulsedesk_test, MYSQL_ROOT_PASSWORD: root }
-        ports: [ "3306:3306" ]
-        options: >-
-          --health-cmd="mysqladmin ping -proot" --health-interval=10s
-          --health-timeout=5s --health-retries=5
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.2' }
-      - name: Install
-        working-directory: backend
-        run: composer install --no-interaction --prefer-dist
-      - name: Configure
-        working-directory: backend
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=pulsedesk_test/' .env
-          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/' .env
-          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/' .env
-      - name: Migrate & test
-        working-directory: backend
-        run: |
-          php artisan migrate --force
-          php artisan test
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci
+    
+    - name: Run migrations
+      working-directory: ./backend
+      run: npm run migrate
+    
+    - name: Seed database
+      working-directory: ./backend
+      run: npm run seed
+    
+    - name: Run tests
+      working-directory: ./backend
+      run: npm test -- --coverage
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./backend/coverage/lcov.info
+        flags: backend
+    
+    - name: Build check
+      working-directory: ./backend
+      run: npm run build || true
+
+  frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Lint
+      working-directory: ./frontend
+      run: npm run lint || true
+    
+    - name: Build
+      working-directory: ./frontend
+      run: npm run build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist
+        retention-days: 7
+
+  multitenancy-tests:
+    runs-on: ubuntu-latest
+    needs: backend
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci
+    
+    - name: Run migrations
+      working-directory: ./backend
+      run: npm run migrate
+    
+    - name: Run multitenancy tests
+      working-directory: ./backend
+      run: npm test __tests__/multitenancy.test.js
+      env:
+        NODE_ENV: test

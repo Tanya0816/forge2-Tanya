@@ -1,7 +1,7 @@
 Goal:Build a mulit-tenant support disk SaaS and name it "PulseDesk". Use tech stack -
 Frontend: React 19 + Vite, styled with Tailwind
 
-Tests: Pest or PHPUnit feature tests on the API
+Tests: Pest or PHP Unit feature tests on the API
 
 CI: A github actions workflow that installs,migrates and runs tests on each PR.
 Core features it must have-

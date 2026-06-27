@@ -1,0 +1,27 @@
+{
+  "name": "PulseDesk API",
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "PORT": {
+      "description": "Server port",
+      "value": "3000"
+    },
+    "JWT_SECRET": {
+      "description": "JWT secret key (generate a strong random string)",
+      "generator": "secret"
+    }
+  },
+  "healthcheckPath": "/health",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "mounts": [
+    {
+      "type": "volume",
+      "target": "/app/pulsedesk.db"
+    }
+  ]
+}

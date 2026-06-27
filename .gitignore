@@ -6,3 +6,5 @@
 .DS_Store
 # never commit real secrets / keys
 /hermes/.env
+/backend/node_modules
+
