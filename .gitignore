@@ -5,3 +5,4 @@
 /frontend/dist
 .DS_Store
 # never commit real secrets / keys
+/hermes/.env
